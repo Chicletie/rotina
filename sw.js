@@ -1,5 +1,5 @@
 /* Rotina — service worker (offline + atualização) */
-var CACHE = "rotina-cache-v6-1";
+var CACHE = "rotina-cache-v7";
 var SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", function (e) {
@@ -52,8 +52,9 @@ self.addEventListener("fetch", function (e) {
     return;
   }
 
-  // Google Fonts: usa o cache, atualiza em segundo plano
-  if (url.host === "fonts.googleapis.com" || url.host === "fonts.gstatic.com") {
+  // Google Fonts + SDK do Firebase (gstatic): usa o cache, atualiza em segundo plano
+  if (url.host === "fonts.googleapis.com" || url.host === "fonts.gstatic.com" ||
+      (url.host === "www.gstatic.com" && url.pathname.indexOf("/firebasejs/") === 0)) {
     e.respondWith(
       caches.match(req).then(function (m) {
         var net = fetch(req).then(function (r) {

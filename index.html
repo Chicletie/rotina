@@ -16,6 +16,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 
 <style>
   :root { color-scheme: light dark; }
@@ -2352,11 +2355,22 @@
     v.appendChild(ac);
 
     var c = el("div", { class: "card" });
-    c.appendChild(sectionLabel("Ajustes"));
-    c.appendChild(el("div", { class: "sync-line js-sync", style: "padding-bottom:12px" }));
-    c.appendChild(el("button", { class: "mini-btn", type: "button", text: "Backup / apagar dados", style: "margin-bottom:8px", onclick: function () { document.getElementById("exportBtn").click(); } }));
-    c.appendChild(el("button", { class: "mini-btn", type: "button", text: "Alternar tema claro/escuro", onclick: function () { document.getElementById("themeBtn").click(); } }));
+    c.appendChild(sectionLabel("Sincronização"));
+    c.appendChild(el("div", { class: "sync-line js-sync", style: "padding-bottom:10px" }));
+    if (fbUser) {
+      c.appendChild(el("div", { class: "row-meta", style: "margin-bottom:4px", text: "Conta: " + (fbUser.email || "—") }));
+      c.appendChild(el("div", { class: "row-meta", style: "margin-bottom:8px;font-family:var(--font-mono);font-size:10.5px;word-break:break-all", text: "ID: " + fbUser.uid }));
+      c.appendChild(el("button", { class: "mini-btn", type: "button", text: "Sair da conta", onclick: function () { if (window.confirm("Sair? O app continua funcionando local neste aparelho.")) fbSignOut(); } }));
+    } else {
+      c.appendChild(el("button", { class: "mini-btn", type: "button", text: "Entrar / criar conta", style: "margin-bottom:8px", onclick: openAuthModal }));
+    }
     v.appendChild(c);
+
+    var c2 = el("div", { class: "card" });
+    c2.appendChild(sectionLabel("Ajustes"));
+    c2.appendChild(el("button", { class: "mini-btn", type: "button", text: "Backup / apagar dados", style: "margin-bottom:8px", onclick: function () { document.getElementById("exportBtn").click(); } }));
+    c2.appendChild(el("button", { class: "mini-btn", type: "button", text: "Alternar tema claro/escuro", onclick: function () { document.getElementById("themeBtn").click(); } }));
+    v.appendChild(c2);
     setTimeout(paintSync, 0);
     return v;
   };
@@ -4388,8 +4402,11 @@
   var lastLocalWrite = 0;
   var syncState = "off";
 
+  var fbAuth = null, fbFs = null, fbUser = null;
+
   var SYNC_TEXT = {
     off: ["○", "Só neste aparelho"],
+    signin: ["○", "Toque pra entrar e sincronizar"],
     connecting: ["◍", "Conectando…"],
     synced: ["●", "Sincronizado"],
     saving: ["◍", "Salvando…"],
@@ -4400,6 +4417,8 @@
     var nodes = document.querySelectorAll(".js-sync");
     for (var i = 0; i < nodes.length; i++) {
       nodes[i].innerHTML = '<span class="sync-dot ' + syncState + '">' + t[0] + '</span><span>' + t[1] + '</span>';
+      nodes[i].style.cursor = syncState === "signin" ? "pointer" : "";
+      nodes[i].onclick = syncState === "signin" ? openAuthModal : null;
     }
   }
   function setSync(s) { syncState = s; paintSync(); }
@@ -4420,12 +4439,31 @@
     }, function () { setSync("error"); });
   }
 
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyC2nVLv97V6D1S6rZ7nwhhyQXgWeFxQLd0",
+    authDomain: "rotina-555dd.firebaseapp.com",
+    projectId: "rotina-555dd",
+    storageBucket: "rotina-555dd.firebasestorage.app",
+    messagingSenderId: "979165283716",
+    appId: "1:979165283716:web:258160eb92ead2353e89d1"
+  };
+
   function initCloud() {
-    if (!(window.claude && typeof window.claude.use === "function")) { setSync("off"); return; }
+    if (typeof firebase === "undefined" || !firebase.initializeApp) { setSync("off"); return; }
+    try { if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG); }
+    catch (e) { setSync("off"); return; }
+    fbAuth = firebase.auth();
+    fbFs = firebase.firestore();
+    try { fbFs.enablePersistence({ synchronizeTabs: true }).catch(function () {}); } catch (e) {}
     setSync("connecting");
-    Promise.resolve(window.claude.use("db")).then(function (db) {
-      if (!db) { setSync("off"); return; }
-      try { cloudDoc = db.doc("app/state"); } catch (e) { setSync("off"); return; }
+    fbAuth.onAuthStateChanged(function (user) {
+      fbUser = user;
+      var m = document.getElementById("authModal");
+      if (user && m) m.parentNode.innerHTML = "";
+      if (current === "mais") render();
+      if (!user) { cloudDoc = null; setSync("signin"); return; }
+      setSync("connecting");
+      cloudDoc = fbFs.collection("app").doc("state");
       cloudDoc.onSnapshot(function (snap) {
         var data = snap && snap.exists ? snap.data() : null;
         if (!data || !data.state) { pushCloud(); setSync("synced"); return; }
@@ -4441,11 +4479,60 @@
         } catch (e) {}
         applyingRemote = false;
         setSync("synced");
-      }, function (err) {
-        setSync(err && err.code === "revoked" ? "off" : "error");
-      });
-    }, function () { setSync("off"); });
+      }, function () { setSync("error"); });
+    });
   }
+
+  function fbErrMsg(code) {
+    var m = {
+      "auth/invalid-email": "E-mail inválido.",
+      "auth/missing-password": "Digite a senha.",
+      "auth/weak-password": "Senha muito curta (mínimo 6).",
+      "auth/email-already-in-use": "Esse e-mail já tem conta — use Entrar.",
+      "auth/invalid-credential": "E-mail ou senha incorretos.",
+      "auth/wrong-password": "Senha incorreta.",
+      "auth/user-not-found": "Não achei essa conta — use Criar conta.",
+      "auth/too-many-requests": "Muitas tentativas. Espere um pouco.",
+      "auth/network-request-failed": "Sem conexão.",
+      "auth/operation-not-allowed": "Login por e-mail não está ligado no Firebase."
+    };
+    return m[code] || ("Erro: " + code);
+  }
+  function openAuthModal() {
+    var root = document.getElementById("modalRoot");
+    var m = el("div", { class: "modal-wrap", onclick: function (e) { if (e.target === m) root.innerHTML = ""; } });
+    var errBox = el("div", { style: "color:var(--neg);font-size:13px;min-height:18px;margin-top:4px" });
+    var busy = false;
+    function run(fn) {
+      if (busy || !fbAuth) return;
+      var email = box.querySelector("[name=email]").value.trim();
+      var pw = box.querySelector("[name=pw]").value;
+      errBox.textContent = "";
+      busy = true; box.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
+      fn(email, pw).catch(function (er) {
+        errBox.textContent = fbErrMsg(er && er.code);
+        busy = false; box.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
+      });
+    }
+    var box = el("div", { class: "modal" }, [
+      el("h3", { text: "Entrar pra sincronizar" }),
+      el("p", { style: "font-size:13px;color:var(--muted);margin:0 0 12px", text: "Uma conta só sua liga o celular e o PC. Sem conta, o app funciona normal mas só neste aparelho." }),
+      el("input", { class: "field", name: "email", type: "email", placeholder: "seu@email.com", autocomplete: "email", style: "width:100%;margin-bottom:8px" }),
+      el("input", { class: "field", name: "pw", type: "password", placeholder: "senha", autocomplete: "current-password", style: "width:100%" }),
+      errBox,
+      el("div", { class: "modal-actions" }, [
+        el("button", { class: "btn ghost", type: "button", text: "Criar conta", onclick: function () { run(function (e, p) { return fbAuth.createUserWithEmailAndPassword(e, p); }); } }),
+        el("button", { class: "btn", type: "button", text: "Entrar", onclick: function () { run(function (e, p) { return fbAuth.signInWithEmailAndPassword(e, p); }); } })
+      ]),
+      el("button", { class: "link", type: "button", text: "continuar sem conta", style: "display:block;margin:10px auto 0", onclick: function () { root.innerHTML = ""; } })
+    ]);
+    m.appendChild(box);
+    root.innerHTML = "";
+    root.appendChild(m);
+    m.id = "authModal";
+    setTimeout(function () { var i = box.querySelector("[name=email]"); if (i) i.focus(); }, 20);
+  }
+  function fbSignOut() { if (fbAuth) fbAuth.signOut(); }
 
   render();
   paintSync();
