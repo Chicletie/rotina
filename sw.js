@@ -1,10 +1,14 @@
 /* Rotina — service worker (offline + atualização) */
-var CACHE = "rotina-cache-v6";
+var CACHE = "rotina-cache-v6-1";
 var SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).catch(function () {}));
+  e.waitUntil(
+    caches.open(CACHE).then(function (c) {
+      return Promise.all(SHELL.map(function (u) { return c.add(u).catch(function () {}); }));
+    })
+  );
 });
 
 self.addEventListener("activate", function (e) {
