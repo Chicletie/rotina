@@ -1,9 +1,14 @@
-# Rotina
+# life
 
-App pessoal de estilo de vida — agenda, estudos (ENEM), saúde, finanças, práticas (bruxaria/tarô), cozinha, worldbuilding e notas. Um único arquivo HTML, sem framework, com armazenamento local no navegador.
+App pessoal de estilo de vida — agenda, estudos (ENEM), saúde, finanças, práticas (bruxaria/tarô), cozinha e notas. Um único arquivo HTML, sem framework.
 
 - **App:** `index.html`
-- **PWA:** `manifest.webmanifest` + `sw.js` (funciona offline, instala na tela inicial)
-- **Ícone:** `icon.svg`
+- **PWA:** `manifest.webmanifest` + `sw.js` (offline, instala na tela inicial)
+- **Sincronização:** Firebase (projeto `rotina-555dd`, coleção `app`), login por e-mail
 
-Publicado com GitHub Pages. Os dados ficam no navegador de cada aparelho (use **Backup dos dados** no menu Mais para exportar/importar). Sincronização entre aparelhos via Firebase é o próximo passo.
+A parte de worldbuilding virou um app-irmão: **tree** (`github.com/chicletie/arvore`).
+
+## Recuperar num PC novo
+1. Instale o GitHub Desktop, clone `github.com/chicletie/rotina`
+2. O site continua no ar em `chicletie.github.io/rotina` mesmo sem o PC
+3. Os dados estão no Firebase + no celular — entre na conta no app

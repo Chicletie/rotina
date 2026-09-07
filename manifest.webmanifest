@@ -1,7 +1,7 @@
 {
-  "name": "Rotina",
-  "short_name": "Rotina",
-  "description": "App pessoal: agenda, estudos, saúde, finanças, práticas, cozinha, criação e notas num só lugar.",
+  "name": "life",
+  "short_name": "life",
+  "description": "App pessoal: agenda, estudos, saúde, finanças, práticas, cozinha e notas num só lugar.",
   "lang": "pt-BR",
   "start_url": "./",
   "scope": "./",
